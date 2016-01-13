@@ -2,6 +2,7 @@ Notify
 ======
 
 [![Build Status](https://travis-ci.org/mlebrun/notify.svg?branch=master)](https://travis-ci.org/mlebrun/notify)
+[![Coverage Status](https://coveralls.io/repos/mlebrun/notify/badge.svg?branch=master&service=github)](https://coveralls.io/github/mlebrun/notify?branch=master)
 
 A pub/sub plugin for [Primus](https://github.com/primus/primus).
 
