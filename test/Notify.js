@@ -49,6 +49,8 @@ describe('Notify', function () {
   });
 
   afterEach(function afterEach(done) {
+    connected = [];
+
     if (client1) {
       client1.end();
       client1 = null;
@@ -64,13 +66,37 @@ describe('Notify', function () {
       client3 = null;
     }
 
-    connected = [];
-
     primus.end(function() {
       subscriber.subscribe.restore();
       subscriber.unsubscribe.restore();
       done();
     });
+  });
+
+  it('should error when setting an invalid Notify instance', function(done) {
+    try {
+      primus.notify = 5;
+    }
+    catch(e) {
+      done();
+    }
+  });
+
+  it('should error when setting an invalid subscriber', function(done) {
+    try {
+      primus.subscriber = 5;
+    }
+    catch(e) {
+      done();
+    }
+  });
+
+  it('should expose the subscriber', function(done) {
+    var sub = primus.subscriber;
+    assert.isObject(sub);
+    assert.instanceOf(sub, RedisSubscriber);
+    assert.strictEqual(sub, subscriber);
+    done();
   });
 
   it('should subscribe to a key when a Spark is first to join a room', function(done) {
@@ -81,7 +107,7 @@ describe('Notify', function () {
         return;
       }
 
-      setTimeout(function() {
+      setTimeout(function resolve() {
         assert.isTrue(subscriber.subscribe.calledOnce);
         assert.isTrue(subscriber.subscribe.calledWith('somekey'));
         done();
@@ -342,19 +368,13 @@ describe('Notify', function () {
     client3 = getClient();
   });
 
-  it('should notify all Sparks in a room when a messaged is published', function(done) {
+  it('should notify all Sparks in a room when a messaged is published (string)', function(done) {
     var subscribed = false,
         total_joined = 0,
         total_resolved = 0,
-        expected = { foo: 'bar' },
-        message = {
-          type: 'someevent',
-          data: expected
-        };
+        message = { type: 'someevent' };
 
     function resolve(data) {
-      assert.strictEqual(JSON.stringify(data), JSON.stringify(expected));
-
       ++total_resolved;
 
       if (total_resolved < 3) {
@@ -402,5 +422,145 @@ describe('Notify', function () {
 
     client3 = getClient();
     client3.on('someevent', resolve);
+  });
+
+  it('should notify all Sparks in a room when a messaged is published (object)', function(done) {
+    var subscribed = false,
+        total_joined = 0,
+        total_resolved = 0,
+        message = { type: 'someevent' };
+
+    function resolve() {
+      ++total_resolved;
+
+      if (total_resolved < 3) {
+        return;
+      }
+
+      done();
+    }
+
+    function ready() {
+      if (total_joined < 3 || !subscribed) {
+        return;
+      }
+
+      subscriber.emit('message', 'somekey', message);
+    }
+
+    subscriber.on('subscribed', function() {
+      subscribed = true;
+      ready();
+    });
+
+    primus.on('joinroom', function() {
+      ++total_joined;
+      ready();
+    });
+
+    primus.on('connection', function(spark) {
+      connected.push(spark);
+
+      if (connected.length < 3) {
+        return;
+      }
+
+      client1.emit('subscribe', 'somekey');
+      client2.emit('subscribe', 'somekey');
+      client3.emit('subscribe', 'somekey');
+    });
+
+    client1 = getClient();
+    client1.on('someevent', resolve);
+
+    client2 = getClient();
+    client2.on('someevent', resolve);
+
+    client3 = getClient();
+    client3.on('someevent', resolve);
+  });
+
+  it('should notify all Sparks in a room when a messaged is published, with data', function(done) {
+    var subscribed = false,
+        total_joined = 0,
+        total_resolved = 0,
+        expected = { foo: 'bar' },
+        message = {
+          type: 'someevent',
+          data: expected
+        };
+
+    function resolve(data) {
+      assert.strictEqual(JSON.stringify(data), JSON.stringify(expected));
+
+      ++total_resolved;
+
+      if (total_resolved < 3) {
+        return;
+      }
+
+      done();
+    }
+
+    function ready() {
+      if (total_joined < 3 || !subscribed) {
+        return;
+      }
+
+      subscriber.emit('message', 'somekey', message);
+    }
+
+    subscriber.on('subscribed', function() {
+      subscribed = true;
+      ready();
+    });
+
+    primus.on('joinroom', function() {
+      ++total_joined;
+      ready();
+    });
+
+    primus.on('connection', function(spark) {
+      connected.push(spark);
+
+      if (connected.length < 3) {
+        return;
+      }
+
+      client1.emit('subscribe', 'somekey');
+      client2.emit('subscribe', 'somekey');
+      client3.emit('subscribe', 'somekey');
+    });
+
+    client1 = getClient();
+    client1.on('someevent', resolve);
+
+    client2 = getClient();
+    client2.on('someevent', resolve);
+
+    client3 = getClient();
+    client3.on('someevent', resolve);
+  });
+
+  it('should error when a messaged is received without a type', function(done) {
+    var subscribed = false,
+        notify = primus.notify;
+        message = { data: { foo: 'bar' } };
+
+    subscriber.on('subscribed', function ready() {
+      try {
+        subscriber.emit('message', 'somekey', JSON.stringify(message));
+      }
+      catch(e) {
+        assert.isTrue(primus.notify.onMessage.threw());
+        notify.onMessage.restore();
+        done();
+      }
+    });
+
+    sinon.spy(notify, 'onMessage');
+
+    client1 = getClient();
+    client1.emit('subscribe', 'somekey');
   });
 });

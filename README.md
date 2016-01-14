@@ -107,5 +107,4 @@ var util = require('util'),
 #### TODO
 
 - Link to pre-built subscribers
-- Display coverage
-- Finish tests
+- Flesh out README more
