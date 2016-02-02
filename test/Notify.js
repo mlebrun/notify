@@ -1,21 +1,34 @@
-var http = require('http').Server,
+var util = require('util'),
+    http = require('http').Server,
     sinon = require('sinon'),
     assert = require('chai').assert,
+    EventEmitter = require('events'),
     Primus = require('primus'),
-    Emit = require('primus-emit'),
-    Rooms = require('primus-rooms'),
     Notify = require('../'),
-    RedisSubscriber = require('notify-redis-subscriber'),
     connected = [],
     opts = { transformer: 'websockets' },
     server, subscriber, primus, client1, client2, client3;
 
-// creates the subscriber
-function getSubscriber(opts) {
-  return new RedisSubscriber(opts);
+function FakeSubscriber() {
+  EventEmitter.call(this);
 }
 
-// creates the client
+util.inherits(FakeSubscriber, EventEmitter);
+
+FakeSubscriber.prototype.subscribe = function(key) {
+  this.emit('subscribed', key);
+};
+
+FakeSubscriber.prototype.unsubscribe = function(key) {
+  this.emit('unsubscribed', key);
+};
+
+// creates a simple subscriber
+function getSubscriber(opts) {
+  return new FakeSubscriber(opts);
+}
+
+// creates a connected client
 function getClient() {
   var addr = server.address();
   if (!addr) throw new Error('Server is not listening');
@@ -25,8 +38,6 @@ function getClient() {
 // creates the Primus server
 function getServer(srv, opts) {
   return new Primus(srv, opts)
-    .use('emit', Emit)
-    .use('rooms', Rooms)
     .use('notify', Notify);
 }
 
@@ -34,16 +45,13 @@ describe('Notify', function () {
   beforeEach(function beforeEach(done) {
     server = http();
     subscriber = getSubscriber(opts);
+
     opts.subscriber = subscriber;
+
     primus = getServer(server, opts);
 
-    sinon.stub(subscriber, 'subscribe', function(room) {
-      subscriber.emit('subscribed', room);
-    });
-
-    sinon.stub(subscriber, 'unsubscribe', function(room) {
-      subscriber.emit('unsubscribed', room);
-    });
+    sinon.spy(subscriber, 'subscribe');
+    sinon.spy(subscriber, 'unsubscribe');
 
     server.listen(done);
   });
@@ -94,7 +102,7 @@ describe('Notify', function () {
   it('should expose the subscriber', function(done) {
     var sub = primus.subscriber;
     assert.isObject(sub);
-    assert.instanceOf(sub, RedisSubscriber);
+    assert.instanceOf(sub, FakeSubscriber);
     assert.strictEqual(sub, subscriber);
     done();
   });

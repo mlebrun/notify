@@ -28,7 +28,9 @@
     "url": "https://github.com/mlebrun/notify/issues"
   },
   "dependencies": {
-    "debug": "~2.2.0"
+    "debug": "~2.2.0",
+    "primus-emit": "^0.1.2",
+    "primus-rooms": "~3.3.0"
   },
   "devDependencies": {
     "chai": "*",
@@ -39,7 +41,6 @@
     "primus": "^4.0.1",
     "primus-emit": "~0.1.2",
     "primus-rooms": "~3.3.0",
-    "notify-redis-subscriber": "git://github.com/mlebrun/notify-redis-subscriber.git#master",
     "ws": "~0.8.0"
   }
 }
